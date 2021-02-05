@@ -27,7 +27,7 @@ import org.springframework.core.env.Environment;
  */
 public class BaseController {
     /**
-     * 配置文件加载
+     * 配置文件加载 tste
      */
     @Autowired
     protected Environment config;
