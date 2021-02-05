@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh_CN">
+<head>
+	<meta charset="utf-8">
+	<title>Quick Start</title>
+	<style type="text/css">
+		* {
+			margin: 0;
+			padding: 0;
+		}
+		body {
+			overflow: hidden;
+		}
+		#iframe {
+			margin: 0 auto;
+			border: 0 none;
+			overflow: hidden;
+		}
+	 </style>
+</head>
+<body>
+<div class="bd">
+	<div class="iframe-wrap">
+		<iframe id="iframe" src="https://openhome.alipay.com/platform/ide/quickStartPage.htm#/"></iframe>
+	</div>
+</div>
+<script type="text/javascript" src="https://gw.alipayobjects.com/os/lib/jquery/3.3.1/jquery.min.js"></script>
+<script type="text/javascript">
+	var App = (function () {
+		var app = {
+			$window: $(window),
+			$iframe: $('#iframe'),
+			postMessage: window.postMessage,
+			initData: {
+				isApp: true,
+				url: window.location.href
+			}
+		};
+		if (!app.postMessage) {
+			alert('亲～请使用现代浏览器访问。');
+		}
+		function setIframeRect() {
+			var winWidth = app.$window.width();
+			var winHeight = app.$window.height();
+			app.$iframe.width(winWidth);
+			app.$iframe.height(winHeight);
+		}
+		function start() {
+			setIframeRect();
+			$('#iframe').on('load', function (e) {
+				var initMsg = '';
+                try {
+                    initMsg = JSON.stringify(app.initData);
+                } catch (e) { }
+                $('#iframe')[0].contentWindow.postMessage(initMsg, '*');
+			});
+			app.$window.on('resize', function (e) {
+				setIframeRect();
+			});
+			app.$window.on('message', function (e) {
+				var jsonData = null;
+				var originTarget = e.originalEvent || {};
+				var data = originTarget.data || null;
+				try {
+					jsonData = JSON.parse(data)
+				} catch(e) { }
+				if(jsonData) {
+					requestServer(jsonData);
+				}
+			});
+			/*
+			 * 轮询1分钟多，避免登录后跳转的问题，因为内嵌的登录页面做了一层跳转处理
+			 * 请不要在这里做随意修改哦～
+			 */
+			// 页面的计数
+			var prevent = 0;
+			// 监听的钩子
+			var timer = null;
+			// 最多监听1分钟，默认0.1秒钟循环一次，为了保障不要一直在监听，如果没有成功就只能手动恢复访问了...
+			var maxTime = 600;
+			// 当前监听的进度
+			var currentTime = 0;
+			// 监听页面离开的事件
+			app.$window.on('beforeunload', function (e) {
+				prevent++;
+			});
+			timer = setInterval(function() {
+				currentTime++;
+				if (currentTime >= maxTime) {
+					clearInterval(timer);
+				}
+                if (prevent > 0) {
+                	// 只嵌套一层
+                    prevent -= 2;
+                    // 这里的域名必须要是你本地启动的域名相同，不然 AJAX 会出现跨域
+                    window.top.location = window.location.href;
+                }
+			}, 100);
+		}
+		// 请求本地的服务，获取用户信息
+		function requestServer(message) {
+			// 如果消息没有数据或者解析出错
+			if(!message) {
+				return ;
+			}
+			// 正常情况接到消息就请求本地服务
+			var url = message.url || '';
+			var authCodeObj = message.authCode || {};
+			var authCode = authCodeObj.data || '';
+			$.ajax({
+				url: url,
+				method: 'GET'
+			}).then(function (res) {
+				var data = {
+					isUser: true,
+					user: res
+				};
+				var msg = '';
+				try {
+					msg = JSON.stringify(data);
+				} catch (e) {
+					msg = '';
+				}
+				$('#iframe')[0].contentWindow.postMessage(msg, '*');
+			}).catch(function (res) {
+				if (res && res.status === 500) {
+					alert('请求失败：请检测是否在第一步中授权成功');
+				}
+			});
+		}
+		return {
+			start: start
+		};
+	})();
+
+	App.start();
+</script>
+</body>
+</html>
